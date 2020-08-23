@@ -1,0 +1,8 @@
+{
+    "name": "or-function",
+
+    "dependencies":
+    {
+        "neural-d": { "path": "../.." }
+    }
+}
