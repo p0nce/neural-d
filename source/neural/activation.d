@@ -1,7 +1,7 @@
 module neural.activation;
 
 import inteli.math;
-
+/*
 enum ActivationFunction
 {
     identity,
@@ -18,11 +18,7 @@ float sigmoidDerivative(float x)
     float ex = _mm_exp_ss(-x);
     return ex / (ex + 1.0)*(ex + 1.0);
 }
-
-
-// Type of Layers
-// dense, dropout, convolutional, pooling, recurrent layers
-
+*/
 
 
 void softmax(double[] inoutCoeffients)
