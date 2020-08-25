@@ -6,6 +6,7 @@ import neural.optimizer;
 
 import std.random;
 import std.math;
+import std.string;
 
 /// Base abstract class of all types of layers.
 class NeuralLayer
@@ -50,6 +51,9 @@ class NeuralLayer
     // - should allocate and initialize weights arrays.
     abstract void initialize(Shape inputShape);
 
+    /// Returns: number of trainable parameters.
+    abstract int trainableParams();
+
     /// Returns: `true` if this layer has any parameters to be learnt.
     abstract bool isTrainable();
 
@@ -83,7 +87,9 @@ class Sequential : NeuralLayer
 
         if (_currentInputShape.isValid)
         {
+            assert(!layer._initialized);
             layer.initialize(_currentInputShape);
+            layer._initialized = true;
             _currentInputShape = layer.outputShape;
         }
     }
@@ -110,6 +116,16 @@ class Sequential : NeuralLayer
         return false;
     }
 
+    override int trainableParams()
+    {
+        int sum = 0;
+        foreach(layer; _layers)
+        {
+            sum += layer.trainableParams();
+        }
+        return sum;
+    }    
+
     override void doPredict(ref const(Tensor) input, ref Tensor output)
     {
         Tensor t;
@@ -121,6 +137,7 @@ class Sequential : NeuralLayer
         }
     }
 
+  
     /// Gets the list of layers.
     inout(NeuralLayer)[] layers() inout
     {
@@ -139,11 +156,39 @@ class Sequential : NeuralLayer
         _lossFunction = loss;
     }
 
-    // TODO: x and y should be tensors... but dimensionality would be broken
-    void fit(float[] x, float[] y, int epochs)
+    void summary()
+    {
+        import std.stdio;
+
+        writeln("Model:");
+        writeln("_________________________________________________________________");
+        writeln("Layer (type)                   Output Shape              Param #   ");
+        writeln("=================================================================");
+
+        foreach(layer; _layers)
+        {
+            string shapeStr = format("%s", layer.outputShape);
+            writefln("%-30s %-26s %s",
+                layer.classinfo.name, shapeStr, layer.trainableParams);
+            writeln("_________________________________________________________________");
+        }
+
+        writefln("Total params: %s", trainableParams());
+        writefln("Trainable params: %s", trainableParams());
+        writeln("Non-trainable params: 0");
+    }
+
+    void fit(float* x, 
+             float* y, 
+             Shape inputShape,
+             Shape outputShape, int epochs)
     {
         foreach(epoch; 0..epochs)
         {
+
+          //  for x,y in zip(x_train, y_train):
+
+
          /*   foreach()
             // forward pass
 */
@@ -181,6 +226,11 @@ class Input : NeuralLayer
     override bool isTrainable()
     {
         return false;
+    }
+
+    override int trainableParams()
+    {
+        return 0;
     }
 
     override void doPredict(ref const(Tensor) input, ref Tensor output)
@@ -225,6 +275,13 @@ class Dense : NeuralLayer
         {
             w = uniform(lowerBound, upperBound);
         }
+    }
+
+    override int trainableParams()
+    {
+        assert(_initialized);
+        return _batchSize // bias
+              + _batchSize * _inputShape.batchSize; // weights
     }
 
     override bool isTrainable()
@@ -304,6 +361,11 @@ class Activation : NeuralLayer
     {
         return false;
     }
+
+    override int trainableParams()
+    {
+        return 0;
+    }    
 
     override void doPredict(ref const(Tensor) input, ref Tensor output)
     {

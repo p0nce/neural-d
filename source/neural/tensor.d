@@ -75,6 +75,7 @@ public:
 
     void resize(Shape shape)
     {
+        assert((_data is null));
         _data.length = shape.elemCount();
         _shape = shape;
     }
@@ -94,26 +95,42 @@ public:
         return _data;
     }
 
+    // Get a const tensor with less dimensions.
+    const(Tensor) opIndex(size_t n)
+    {
+        assert(false);
+    }
+
 private:
     Shape _shape = Shape(0, 0, 0, 0);
     float[] _data = null;
 }
 
-Tensor zeroes(Shape shape)
+unittest
+{
+    Tensor t;
+    t.resize(Shape(5,2,3,4));
+    const(Tensor) q = t[0];
+}
+
+Tensor tensorConstant(float value, Shape shape)
 {
     Tensor t = Tensor(shape);
-    t.fillWith(0.0f);
+    t.fillWith(value);
     return t;
 }
 
-Tensor ones(Shape shape)
+Tensor tensorZeroes(Shape shape)
 {
-    Tensor t = Tensor(shape);
-    t.fillWith(1.0f);
-    return t;
+    return tensorConstant(0.0f, shape);
 }
 
-Tensor randomUniform(Shape shape)
+Tensor tensorOnes(Shape shape)
+{
+    return tensorConstant(1.0f, shape);
+}
+
+Tensor tensorRandomUniform(Shape shape)
 {
     Tensor t = Tensor(shape);
     foreach(ref f; t.rawData)
