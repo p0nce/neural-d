@@ -3,9 +3,9 @@ import neural;
 
 import std.random;
 
-float addFunction(float x, float y)
+float functionToApproximate(float x)
 {
-    return x * 0.7f + y * 0.3f + 1;
+    return 3.14150f * x + uniform(-0.2f, 0.2f);
 }
 
 void main(string[] args)
@@ -20,7 +20,7 @@ void main(string[] args)
     for(int n = 0; n < N_DATASET; ++n)
     {
         x[n] = uniform(-1, 1);
-        y[n] = 3.14150f * x[n] + uniform(-0.2f, 0.2f);
+        y[n] = functionToApproximate(x[n]);
     }
 
     auto model = new Sequential();
@@ -28,9 +28,18 @@ void main(string[] args)
     model.add( new Activation(ActivationFunction.SELU ) );
     model.add( new Dense(1) );
 
+    model.summary();
+
     model.compile(new SGDOptimizer(0.01f), LossFunction.MSE );
 
     int epochs = 10;
-    model.fit(x[0..N_TRAINING], y[0..N_TRAINING], epochs);
+   /* model.fit(&x[0], 
+              &y[0], 
+              N_TRAINING,
+              epochs);*/
+
+  //  model.evaluate()
+
+
 }
 
