@@ -2,6 +2,7 @@ module neural.layer;
 
 import neural.tensor;
 import neural.activation;
+import neural.optimizer;
 
 import std.random;
 import std.math;
@@ -74,17 +75,16 @@ class Sequential : NeuralLayer
         if (inputShape.isValid)
         {
             // giving a shape is only valid for the first layer
-            assert(_layers.length == 0); 
+            assert(_layers.length == 0);
+            _currentInputShape = inputShape; 
         }
 
         _layers ~= layer;
 
-        // Wire if not the first        
-        if(_layers.length >= 2)
+        if (_currentInputShape.isValid)
         {
-            // wire to previous
-            auto previous = _layers[$-2];
-    //        wire(previous, layer);
+            layer.initialize(_currentInputShape);
+            _currentInputShape = layer.outputShape;
         }
     }
 
@@ -113,24 +113,58 @@ class Sequential : NeuralLayer
     override void doPredict(ref const(Tensor) input, ref Tensor output)
     {
         Tensor t;
-        tensorCopy(t, input);
+        tensorAssign(t, input);
         foreach(layer; _layers)
         {
             layer.predict(t, output);
-            tensorCopy(t, output);
+            tensorAssign(t, output);
         }
     }
 
+    /// Gets the list of layers.
     inout(NeuralLayer)[] layers() inout
     {
         return _layers;
     }
 
+    /// Drops last layer.
+    void pop()
+    {
+        _layers = _layers[0..$-1];
+    }
+
+    void compile(Optimizer optimizer, LossFunction loss)
+    {
+        _optimizer = optimizer;
+        _lossFunction = loss;
+    }
+
+    // TODO: x and y should be tensors... but dimensionality would be broken
+    void fit(float[] x, float[] y, int epochs)
+    {
+        foreach(epoch; 0..epochs)
+        {
+         /*   foreach()
+            // forward pass
+*/
+
+        }
+
+    }
+
+
 private:
     NeuralLayer[] _layers;
+
+    // used while building the net, for eager initialization
+    Shape _currentInputShape = invalidShape; 
+
+    // Should be here??   
+    Optimizer _optimizer;
+    LossFunction _lossFunction;
 }
 
-/// Input layer
+/// Input layer  (not sure why useful in keras)
 class Input : NeuralLayer
 {
     this(Shape shape)
@@ -249,3 +283,34 @@ unittest
 }
 
 // Do other things in https://keras.io/api/models/sequential/
+
+
+/// Non-linear layer
+class Activation : NeuralLayer
+{
+    this(ActivationFunction activationFunction)
+    {
+        super();
+        _activationFunction = activationFunction;
+    }
+
+    override void initialize(Shape inputShape)
+    {
+        _inputShape = inputShape;
+        _outputShape = inputShape;
+    }
+
+    override bool isTrainable()
+    {
+        return false;
+    }
+
+    override void doPredict(ref const(Tensor) input, ref Tensor output)
+    {
+        tensorCopy(output, input);        
+        applyActivationFunction(_activationFunction, output.rawData);
+    }
+
+private:
+    ActivationFunction _activationFunction;
+}
