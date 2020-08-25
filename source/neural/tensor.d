@@ -2,50 +2,55 @@ module neural.tensor;
 
 import std.random;
 
+// Describe the size of a 1D to 5D array.
 struct Shape
 {
-    int batchSize           = 1;
-    int inputSizeY          = 1;
-    int inputSizeX          = 1;
-    int inputSizeDimensions = 1;
+    int[5] dimension;
+
+    this(int dim0, int dim1 = 1, int dim2 = 1, int dim3 = 1, int dim4 = 1)
+    {
+        dimension[0] = dim0;
+        dimension[1] = dim1;
+        dimension[2] = dim2;
+        dimension[3] = dim3;
+        dimension[4] = dim4;
+    }
 
     // Returns: `true` if the shape is a valid shape. Else it's an unknown shape.
     bool isValid() pure const nothrow @nogc
     {
         // Example: 30 images of 25x25 RGB pixels are (30, 25, 25, 3)
-        return (batchSize           >= 1) 
-            && (inputSizeX          >= 1)
-            && (inputSizeY          >= 1)
-            && (inputSizeDimensions >= 1);
+        return (dimension[0]          >= 1) 
+            && (dimension[1]          >= 1)
+            && (dimension[2]          >= 1)
+            && (dimension[3]          >= 1)
+            && (dimension[4]          >= 1);
     }
 
-    // Returns: `true` if each sample is just one float.
-    bool is1D() pure const nothrow @nogc
+    int numDimensions() pure const nothrow @nogc
     {
-        return inputSizeX == 1 && inputSizeY == 1 && inputSizeDimensions == 1;
+        if (dimension[4] > 1) return 5;
+        if (dimension[3] > 1) return 4;
+        if (dimension[2] > 1) return 3;
+        if (dimension[1] > 1) return 2;
+        if (dimension[0] > 1) return 1;
+        return 0;
     }
 
-    // Returns: `true` if each sample is an array of float.
-    bool is2D() pure const nothrow @nogc
-    {
-        return inputSizeY == 1 && inputSizeDimensions == 1;
-    }
+    bool is1D() pure const nothrow @nogc { return numDimensions() == 1; }
+    bool is2D() pure const nothrow @nogc { return numDimensions() == 1; }
+    bool is3D() pure const nothrow @nogc { return numDimensions() == 1; }
+    bool is4D() pure const nothrow @nogc { return numDimensions() == 1; }
+    bool is5D() pure const nothrow @nogc { return numDimensions() == 1; }
 
     // Number of scalar number to represent this shape.
     int elemCount() pure const nothrow @nogc
     {
-        return batchSize * inputSizeX * inputSizeY * inputSizeDimensions;
-    }
-
-    Shape withBatchSize(int batchSize) pure const nothrow @nogc
-    {
-        Shape s = this;
-        s.batchSize = batchSize;
-        return s;
+        return dimension[0]*dimension[1]*dimension[2]*dimension[3]*dimension[4];
     }
 }
 
-enum invalidShape = Shape(-1, -1, -1, -1);
+enum invalidShape = Shape(-1, -1, -1, -1, -1);
 
 unittest
 {

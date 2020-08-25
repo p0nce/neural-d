@@ -16,6 +16,9 @@ class NeuralLayer
     }
 
     /// Input shape of this layer.
+    /// Layout of the input tensor is:
+    /// 
+    /// [input batchsize x image height x image width x color dimension]
     final Shape inputShape() pure const nothrow @nogc
     {
         assert(_inputShape.isValid);
@@ -23,6 +26,7 @@ class NeuralLayer
     }
     
     /// Output dimension of this layer.
+    /// [output batchsize x image height x image width x color dimension]
     final Shape outputShape() pure const nothrow @nogc
     {
         assert(_outputShape.isValid);
@@ -49,6 +53,7 @@ class NeuralLayer
     // Tasks of this function
     // - should fill _inputShape and _outputShape.
     // - should allocate and initialize weights arrays.
+    // [input batchsize x image height x image width x color dimension]
     abstract void initialize(Shape inputShape);
 
     /// Returns: number of trainable parameters.
@@ -57,7 +62,9 @@ class NeuralLayer
     /// Returns: `true` if this layer has any parameters to be learnt.
     abstract bool isTrainable();
 
-    // Forward inference
+    // Forward inference for one item.
+    // The expected layout of the input and output tensor is:
+    // [input batchsize x image height x image width x color dimension]
     abstract void doPredict(ref const(Tensor) input, ref Tensor output);
 
 protected:
@@ -255,20 +262,21 @@ class Dense : NeuralLayer
 
     override void initialize(Shape inputShape)
     {
-        assert(inputShape.is1D);
+        int inputBatchSize = inputShape.dimension[0];
 
         _inputShape = inputShape;
-        _outputShape = inputShape.withBatchSize(_batchSize);
+        _outputShape = inputShape;
+        _outputShape.dimension[0] = _batchSize;
 
         // Initialize bias
         _bias.length = _batchSize;
         _bias[] = 0;
 
         // Initialize weights
-        _weight.length = _batchSize * inputShape.batchSize;
+        _weight.length = _batchSize * inputBatchSize;
 
         // Xavier initialization for the weights
-        float upperBound = sqrt(6.0f) / sqrt(cast(float)_inputShape.batchSize + _outputShape.batchSize);
+        float upperBound = sqrt(6.0f) / sqrt(cast(float)inputBatchSize + _batchSize);
         float lowerBound = -upperBound;
 
         foreach(ref w; _weight)
@@ -281,7 +289,7 @@ class Dense : NeuralLayer
     {
         assert(_initialized);
         return _batchSize // bias
-              + _batchSize * _inputShape.batchSize; // weights
+              + _batchSize * _inputShape.dimension[0]; // weights
     }
 
     override bool isTrainable()
@@ -291,8 +299,8 @@ class Dense : NeuralLayer
 
     override void doPredict(ref const(Tensor) input, ref Tensor output)
     {
-        int numIns = input.shape().batchSize;
-        int numOuts = output.shape().batchSize;
+        int numIns = input.shape().dimension[0];
+        int numOuts = output.shape().dimension[0];
 
         // For now, only 1x1x1 images supported
         assert(input.shape.is1D && output.shape.is1D);
