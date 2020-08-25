@@ -2,12 +2,14 @@ module neural.tensor;
 
 import std.random;
 
+// Important: in neural-d, the maximum dimension of tensors is 5D.
+
 // Describe the size of a 1D to 5D array.
 struct Shape
 {
     int[5] dimension;
 
-    this(int dim0, int dim1 = 1, int dim2 = 1, int dim3 = 1, int dim4 = 1)
+    this(int dim0, int dim1 = 1, int dim2 = 1, int dim3 = 1, int dim4 = 1) pure nothrow @nogc
     {
         dimension[0] = dim0;
         dimension[1] = dim1;
@@ -33,8 +35,20 @@ struct Shape
         if (dimension[3] > 1) return 4;
         if (dimension[2] > 1) return 3;
         if (dimension[1] > 1) return 2;
-        if (dimension[0] > 1) return 1;
+        if (dimension[0] >= 1) return 1;
         return 0;
+    }
+
+    /// Returns: dimensionality of this[0].
+    Shape itemDimension() pure const nothrow @nogc
+    {
+        return Shape(dimension[1], dimension[2], dimension[3], dimension[4], 1);
+    }
+
+    /// How many scalars there are in this[0]
+    int itemStride() pure const nothrow @nogc
+    {
+        return dimension[1] * dimension[2] * dimension[3] * dimension[4];
     }
 
     bool is1D() pure const nothrow @nogc { return numDimensions() == 1; }
@@ -73,14 +87,16 @@ public:
 
     ~this()
     {
-        _data.length = 0;
+        if (!_borrowed)
+            _data.length = 0;
     }
 
     @disable this(this); // Use tensorCopy to make a copy
 
     void resize(Shape shape)
     {
-        assert((_data is null));
+        assert(shape.isValid);
+        assert(!_borrowed);
         _data.length = shape.elemCount();
         _shape = shape;
     }
@@ -100,13 +116,19 @@ public:
         return _data;
     }
 
-    // Get a const tensor with less dimensions.
-    const(Tensor) opIndex(size_t n)
+    // Get a sub-tensor tensor with less dimensions.
+    Tensor opIndex(size_t n)
     {
-        assert(false);
+        int stride = _shape.itemStride();
+        Tensor t;
+        t._borrowed = true;
+        t._shape    = _shape.itemDimension();
+        t._data     = _data[n*stride..(n+1)*stride];
+        return t;
     }
 
 private:
+    bool _borrowed = false; // Do we own that data?
     Shape _shape = Shape(0, 0, 0, 0);
     float[] _data = null;
 }

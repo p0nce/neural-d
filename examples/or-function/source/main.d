@@ -33,10 +33,10 @@ void main(string[] args)
     model.compile(new SGDOptimizer(0.01f), LossFunction.MSE );
 
     int epochs = 10;
-   /* model.fit(&x[0], 
-              &y[0], 
-              N_TRAINING,
-              epochs);*/
+
+    model.train(Tensor(x[0..N_TRAINING]), 
+                Tensor(y[0..N_TRAINING]), 
+                epochs);
 
   //  model.evaluate()
 
