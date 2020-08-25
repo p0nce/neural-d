@@ -1,25 +1,41 @@
 module neural.activation;
 
 import inteli.math;
-/*
+
 enum ActivationFunction
 {
-    identity,
-    sigmoid
+    ReLU,   
+    SELU, 
 }
 
-float sigmoid(float x)
+void applyActivationFunction(ActivationFunction activation, float[] outputs)
 {
-    return 1.0 / (1.0 + _mm_exp_ss(-x));
-}
+    final switch(activation) with (ActivationFunction)
+    {
+        case ReLU:
+            foreach(ref x; outputs)
+            {
+                if (x < 0) x = 0;
+            }
+            break;
 
-float sigmoidDerivative(float x)
-{
-    float ex = _mm_exp_ss(-x);
-    return ex / (ex + 1.0)*(ex + 1.0);
-}
-*/
+        case SELU:
+            foreach(ref x; outputs)
+            {
+                float alpha = 1.673263242354377f;
+                float scale = 1.05070098735548f;
+                if (x < 0)
+                {
+                    x = alpha * _mm_exp_ss(x) - 1.0f;
+                } 
+            }
+            break;
 
+            // SELU derivative
+            //return self.scale * np.where(x >= 0.0, 1, self.alpha * np.exp(x))
+    }
+}
+       
 
 void softmax(double[] inoutCoeffients)
 {
@@ -45,6 +61,8 @@ void softmax(double[] inoutCoeffients)
 
 unittest
 {
+    import std.math;
+    
     double[] A = [1.0, 3, 2.5, 5, 4, 2];
     softmax(A);
     double[] expected = [0.011, 0.082, 0.05, 0.605, 0.222, 0.030];

@@ -1,152 +1,251 @@
 module neural.layer;
 
+import neural.tensor;
+import neural.activation;
 
-enum ActivationFunction
-{
-    ReLU,    
-}
-
+import std.random;
+import std.math;
 
 /// Base abstract class of all types of layers.
 class NeuralLayer
 {
-    this(int inputDimension, int outputDimension, bool isLearnable)
+    this()
     {
-        _numIns  = inputDimension;
-        _numOuts = outputDimension;
-        _isLearnable = isLearnable;
     }
 
-    /// Input dimension of this layer.
-    final int numIns() pure const nothrow @nogc
+    /// Input shape of this layer.
+    final Shape inputShape() pure const nothrow @nogc
     {
-        return _numIns;
+        assert(_inputShape.isValid);
+        return _inputShape;
     }
     
     /// Output dimension of this layer.
-    final int numOuts() pure const nothrow @nogc
+    final Shape outputShape() pure const nothrow @nogc
     {
-        return _numOuts;
+        assert(_outputShape.isValid);
+        return _outputShape;
+    }    
+
+    void predict(ref const(Tensor) input, ref Tensor output)
+    {
+        // Lazy initialization.
+        if (!_initialized)
+        {
+            initialize(input.shape);
+            _initialized = true;
+        }
+
+        // Eventually the output tensor might be uninitialized
+        output.resize(_outputShape);
+
+        assert(_inputShape == input.shape);
+        assert(_outputShape == output.shape);
+        doPredict(input, output);
     }
+
+    // Tasks of this function
+    // - should fill _inputShape and _outputShape.
+    // - should allocate and initialize weights arrays.
+    abstract void initialize(Shape inputShape);
 
     /// Returns: `true` if this layer has any parameters to be learnt.
-    final bool isTrainable()
-    {
-        return _isLearnable;
-    }
+    abstract bool isTrainable();
 
     // Forward inference
-    abstract void predict(const(float)[] inputs, float[] outputs);
+    abstract void doPredict(ref const(Tensor) input, ref Tensor output);
 
 protected:
-    immutable(int) _numIns;
-    immutable(int) _numOuts;
-    bool _isLearnable;
+    bool _initialized = false;
+    Shape _inputShape = invalidShape;
+    Shape _outputShape = invalidShape;
 }
 
-// A NeuralNetwork can contain several layers, and is also a layer itself.
-class NeuralNetwork : NeuralLayer
+class Sequential : NeuralLayer
 {
-    this(int dimensionIn, int dimensionOut, ActivationFunction activation)
+    this()
     {
-        super(dimensionIn, dimensionOut, true);
+        super();
     }
 
-    void addLayer(NeuralLayer layer)
+    // You can add a sub-neural network
+    void add(NeuralLayer layer, Shape inputShape = invalidShape)
     {
+        if (inputShape.isValid)
+        {
+            // giving a shape is only valid for the first layer
+            assert(_layers.length == 0); 
+        }
+
         _layers ~= layer;
+
+        // Wire if not the first        
+        if(_layers.length >= 2)
+        {
+            // wire to previous
+            auto previous = _layers[$-2];
+    //        wire(previous, layer);
+        }
     }
 
-    override void predict(const(float)[] inputs, float[] outputs)
+    override void initialize(Shape inputShape)
     {
-        // find max dimension in layers,
-        // eventually extend scratch buffers
-        int maxDimension = cast(int)inputs.length;
-        if (maxDimension < cast(int)(outputs.length))
-            maxDimension = cast(int)(outputs.length);
-        foreach(layer; _layers)
-        {
-            if (layer.numIns() > maxDimension)
-                maxDimension = numIns();
-            if (layer.numOuts() > maxDimension)
-                maxDimension = numOuts();
-        }
-        if (_temp1.length < maxDimension)
-        {
-            _temp1.length = maxDimension;
-            _temp2.length = maxDimension;
-        }
+        _inputShape = inputShape;
 
-        _temp1[0..inputs.length] = inputs[];
+        Shape shape = inputShape;        
         foreach(layer; _layers)
         {
-            int nIns = layer.numIns();
-            int nOuts = layer.numOuts();
-            layer.predict(_temp1[0..nIns], _temp2[0..nOuts]);
-            float[] exch = _temp1;
-            _temp1 = _temp2;
-            _temp2 = exch;
+            layer.initialize(shape);
+            shape = layer.outputShape;
         }
-        outputs[] = _temp1[0..outputs.length];
+    }
+
+    override bool isTrainable()
+    {
+        foreach(layer; _layers)
+        {
+            if (layer.isTrainable)
+                return true;
+        }
+        return false;
+    }
+
+    override void doPredict(ref const(Tensor) input, ref Tensor output)
+    {
+        Tensor t;
+        tensorCopy(t, input);
+        foreach(layer; _layers)
+        {
+            layer.predict(t, output);
+            tensorCopy(t, output);
+        }
+    }
+
+    inout(NeuralLayer)[] layers() inout
+    {
+        return _layers;
     }
 
 private:
-    float[] _temp1, _temp2;
     NeuralLayer[] _layers;
 }
 
-class LayerLinear : NeuralLayer
+/// Input layer
+class Input : NeuralLayer
 {
-    this(int dimensionIn, int dimensionOut, ActivationFunction activation)
+    this(Shape shape)
     {
-        super(dimensionIn, dimensionOut, true);
 
-        _bias.length = dimensionOut;
-        _weight.length = dimensionOut * dimensionIn;
-        _activation = activation;
     }
 
-    override void predict(const(float)[] inputs, float[] outputs)
-    {   
-        assert(inputs.length == numIns()); 
-        assert(outputs.length == numOuts());
+    override void initialize(Shape inputShape)
+    {
+        _inputShape = inputShape;
+        _outputShape = inputShape;
+    }
 
-        for (int nOut = 0; nOut < numOuts(); ++nOut)
+    override bool isTrainable()
+    {
+        return false;
+    }
+
+    override void doPredict(ref const(Tensor) input, ref Tensor output)
+    {
+        assert(false);
+    }
+}
+
+
+
+/// Dense, linear layer.
+class Dense : NeuralLayer
+{
+    this(int batchSize)
+    {
+        super();
+        _batchSize = batchSize;
+
+      //  _bias.length = dimensionOut;
+      //  _weight.length = dimensionOut * dimensionIn;
+    }
+
+    override void initialize(Shape inputShape)
+    {
+        assert(inputShape.is1D);
+
+        _inputShape = inputShape;
+        _outputShape = inputShape.withBatchSize(_batchSize);
+
+        // Initialize bias
+        _bias.length = _batchSize;
+        _bias[] = 0;
+
+        // Initialize weights
+        _weight.length = _batchSize * inputShape.batchSize;
+
+        // Xavier initialization for the weights
+        float upperBound = sqrt(6.0f) / sqrt(cast(float)_inputShape.batchSize + _outputShape.batchSize);
+        float lowerBound = -upperBound;
+
+        foreach(ref w; _weight)
+        {
+            w = uniform(lowerBound, upperBound);
+        }
+    }
+
+    override bool isTrainable()
+    {
+        return true;
+    }
+
+    override void doPredict(ref const(Tensor) input, ref Tensor output)
+    {
+        int numIns = input.shape().batchSize;
+        int numOuts = output.shape().batchSize;
+
+        // For now, only 1x1x1 images supported
+        assert(input.shape.is1D && output.shape.is1D);
+
+        for (int nOut = 0; nOut < numOuts; ++nOut)
         {
             float sum = _bias[nOut];
-            for (int nIns = 0; nIns < numIns(); ++nIns)
+            for (int nIns = 0; nIns < numIns; ++nIns)
             {
-                sum += inputs[nIns] * _weight[nIns + nOut * numIns()];
+                sum += input.rawData[nIns] * _weight[nIns + nOut * numIns];
             }
-            outputs[nOut] = sum;
-        }
-        applyActivationFunction(outputs[]);
+            output.rawData[nOut] = sum;
+        }        
     }
 
 private:
-    ActivationFunction _activation;
     float[] _bias; // _numOuts biases
     float[] _weight; // _numIns * _numOuts weights
 
-    void applyActivationFunction(float[] outputs)
-    {
-        final switch(_activation) with (ActivationFunction)
-        {
-            case ReLU:
-                foreach(ref x; outputs)
-                {
-                    if (x < 0) x = 0;
-                }
-                break;
-        }
-    }
+    int _batchSize;
 }
 
-
-double nextRandom(ref ulong seed)
+unittest
 {
-    seed = seed * 1584831133568692850 + 8629370730060374025;
-    ulong r = seed >> 32;
-    seed ^= r;
-    return( ( cast(uint)r ) * 2.32830643653869629e-10 );
+    auto layer = new neural.layer.Dense(32);
+    //auto input = randomUniform(Shape(10, 20));
+
+    auto input = randomUniform(Shape(10));
+    Tensor output;
+    layer.predict(input, output);
 }
+
+unittest
+{
+    // Optionally, the first layer can receive an input shape argument.
+    auto model = new Sequential;
+    model.add(new Dense(8), Shape(16));
+}
+
+unittest
+{
+    auto model = new Sequential;
+    model.add(new Input(Shape(16)));
+    model.add(new Dense(8));
+}
+
+// Do other things in https://keras.io/api/models/sequential/
