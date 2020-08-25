@@ -3,6 +3,6 @@
 
     "dependencies":
     {
-        "neural-d": { "path": "../.." }
+        "neural-d": { "path": "../.." },
     }
 }
