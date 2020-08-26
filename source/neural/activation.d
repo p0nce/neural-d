@@ -1,3 +1,7 @@
+/*
+ * Copyright: 2020 Guillaume Piolat.
+ * License: $(LINK2 http://www.apache.org/licenses/LICENSE-2.0, Apache License Version 2.0)
+ */
 module neural.activation;
 
 import inteli.math;
@@ -8,34 +12,61 @@ enum ActivationFunction
     SELU, 
 }
 
-void applyActivationFunction(ActivationFunction activation, float[] outputs)
+float evalActivationFunction(ActivationFunction activation, float x)
 {
     final switch(activation) with (ActivationFunction)
     {
         case ReLU:
-            foreach(ref x; outputs)
-            {
-                if (x < 0) x = 0;
-            }
-            break;
+        {
+            if (x < 0)
+                return 0;
+            else
+                return x;
+        }
 
         case SELU:
-            foreach(ref x; outputs)
-            {
-                float alpha = 1.673263242354377f;
-                float scale = 1.05070098735548f;
-                if (x < 0)
-                {
-                    x = alpha * _mm_exp_ss(x) - 1.0f;
-                } 
-            }
-            break;
+        {
+            float alpha = 1.673263242354377f;
+            float scale = 1.05070098735548f;
+            if (x < 0)
+                return scale * alpha * (_mm_exp_ss(x) - 1.0f);
+            else
+                return scale * x;
+        }        
+    }
+}
 
-            // SELU derivative
-            //return self.scale * np.where(x >= 0.0, 1, self.alpha * np.exp(x))
+void applyActivationFunction(ActivationFunction activation, float[] outputs)
+{
+    foreach(ref x; outputs)
+    {
+        x = evalActivationFunction(activation, x);
     }
 }
        
+float evalActivationFunctionDerivative(ActivationFunction activation, float x)
+{
+    final switch(activation) with (ActivationFunction)
+    {
+        case ReLU:
+        {
+            if (x < 0)
+                return 0;
+            else
+                return 1;
+        }
+
+        case SELU:
+        {
+            float alpha = 1.673263242354377f;
+            float scale = 1.05070098735548f;
+            if (x < 0)
+                return scale * alpha * _mm_exp_ss(x);
+            else
+                return scale; 
+        }        
+    }
+}
 
 void softmax(double[] inoutCoeffients)
 {

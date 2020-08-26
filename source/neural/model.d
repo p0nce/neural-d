@@ -1,3 +1,8 @@
+/*
+ * Copyright: 2020 Guillaume Piolat.
+ * Copyright: 2017 Netflix, Inc.
+ * License: $(LINK2 http://www.apache.org/licenses/LICENSE-2.0, Apache License Version 2.0)
+ */
 module neural.model;
 
 import std.string;
@@ -27,9 +32,7 @@ class Sequential : NeuralLayer
 
         if (_currentInputShape.isValid)
         {
-            assert(!layer._initialized);
-            layer.initialize(_currentInputShape);
-            layer._initialized = true;
+            layer.lazyInitialization(_currentInputShape);
             _currentInputShape = layer.outputShape;
         }
     }
@@ -68,6 +71,14 @@ class Sequential : NeuralLayer
         return sum;
     }    
 
+    override void allocateTrainingData()
+    {
+        foreach(layer; _layers)
+        {
+            layer.allocateTrainingData();
+        }
+    }
+
     override void doPredict(ref const(Tensor) input, ref Tensor output)
     {
         Tensor t;
@@ -79,7 +90,6 @@ class Sequential : NeuralLayer
         }
     }
 
-  
     /// Gets the list of layers.
     inout(NeuralLayer)[] layers() inout
     {
@@ -123,23 +133,49 @@ class Sequential : NeuralLayer
     /// Train the neural network.
     /// The shape of tensors is:
     /// samples x units x image-height x image-width x colors
-    void train(Tensor x, Tensor y, int epochs)
+    void train(Tensor x, Tensor y, int minibatchSize, int epochs)
     {
+        int numSamples = x.shape.dimension[0];        
+        assert(numSamples >= minibatchSize); // else, no learning
+
+        int numBatches = numSamples / minibatchSize;
+
+        // Initialize the network, so that every layer has a defined shape.
+        lazyInitialization(x[0].shape);
+
+        // Allocated training data
+        allocateTrainingData();
+
         foreach(epoch; 0..epochs)
         {
-            assert(x.shape.dimension[0] == y.shape.dimension[0]);
-            int numSamples = x.shape.dimension[0];
+            assert(x.shape.dimension[0] == y.shape.dimension[0]);   
 
-            for (int sample = 0; sample < numSamples; ++sample)
+            double totalLoss = 0;
+
+            for (int batch = 0;  batch < numBatches; ++batch)
             {
-                Tensor subx = x[sample];
-                Tensor suby = y[sample];
-
-                // Forwards pass, get prediction
-                Tensor pred;
-                predict(subx, pred);
+                int batchStart = batch * minibatchSize;         
+                int batchStop = (batch+1) * minibatchSize;  
 
 
+                // Start a mini-batch
+
+                for (int sample = batchStart; sample < batchStop; ++sample)
+                {
+                    Tensor subx = x[sample];
+                    Tensor suby = y[sample];
+
+                    // Forwards pass, get prediction
+                    Tensor pred;
+                    predict(subx, pred);
+
+                    // TODO: update weights
+
+  
+         //   var outputErrors = targetSignals - finalOutputs;            
+         //   var hiddenErrors = _weightHiddenOutput.Transpose() * outputErrors;
+
+                }
             }
 
 
