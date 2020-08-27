@@ -64,11 +64,17 @@ class NeuralLayer
         doPredict(input, output);
     }
 
-    // TODO: should be a tensor of grads
-    void accumulateGradient(float[] grad)
+    /// `forwardGradients` is the gradient of error for the output
+    /// `backGradients` is the gradient of error for the input, for backpropagation.
+    /// If computing `inGradients` requires computing activation values, 
+    /// those are to be 
+    void accumulateGradient(ref const(Tensor) forwardGradients, ref Tensor backGradients)
     {
-        assert(grad.length == outputShape.dimension[0]);
-        doAccumulateGradient(grad);
+        // Eventually the backward tensor might be uninitialized
+        backGradients.resize(_inputShape);
+        assert(forwardGradients.shape == _outputShape);
+        assert(backGradients.shape == _inputShape);
+        doAccumulateGradient(forwardGradients, backGradients);
     }
 
     // Tasks of this function
@@ -88,54 +94,30 @@ class NeuralLayer
     // [input batchsize x image height x image width x color dimension]
     abstract void doPredict(ref const(Tensor) input, ref Tensor output);
 
-    /// `grad` contains cost gradients for each output of this layer?
-    /// This function's goal is to fill the `_backGradients` member.
-    // TODO: should be a tensor of grads
-    abstract void doAccumulateGradient(float[] grad);
-
-    /// Allocate and training-specific data structures.
-    void allocateTrainingData()
-    {
-        assert(_initialized);
-        _backGradients.length = inputShape.dimension[0];
+    /// Start training.
+    /// `doAccumulateGradient` will be called a number of times between `startBatch()` and `stopBatch()`.
+    /// `startBatch()` should allocate training structures if needed.
+    void startBatch()
+    {        
     }
+
+    /// `forwardGradients` contains cost gradients for each output of this layer.
+    /// This function's goal is to fill the `backGradients` member.
+    abstract void doAccumulateGradient(ref const(Tensor) forwardGradients, ref Tensor backGradients);
+
+    /// `stopBatch()` should train parameters based on the work performed between 
+    /// `doAccumulateGradient`.
+    /// mini-batch size expected to be counted by `doAccumulateGradient` in order to perform averages.
+    void stopBatch(float learningRate)
+    {        
+    }
+
 
 protected:
     bool _initialized = false;
     Shape _inputShape = invalidShape;
     Shape _outputShape = invalidShape;
-    float[] _backGradients; // gradients to propagate back to previous layer
 }
-
-/// Input layer  (not sure why useful in keras)
-class Input : NeuralLayer
-{
-    this(Shape shape)
-    {
-    }
-
-    override void initialize(Shape inputShape)
-    {
-        _inputShape = inputShape;
-        _outputShape = inputShape;
-    }
-
-    override bool isTrainable()
-    {
-        return false;
-    }
-
-    override int trainableParams()
-    {
-        return 0;
-    }
-
-    override void doPredict(ref const(Tensor) input, ref Tensor output)
-    {
-        assert(false);
-    }
-}
-
 
 
 /// Dense, linear layer.
@@ -172,12 +154,6 @@ class Dense : NeuralLayer
         }
     }
 
-    override void allocateTrainingData()
-    {
-        super.allocateTrainingData();
-        _grad.length = _units * _inputUnits;
-    }
-
     override int trainableParams()
     {
         assert(_initialized);
@@ -206,26 +182,72 @@ class Dense : NeuralLayer
                 sum += input.rawData[nIns] * _weight[nIns + nOut * numIns];
             }
             output.rawData[nOut] = sum;
-        }        
+        }  
+
+        tensorAssign(_lastInput, input);       
     }
 
-    override void doAccumulateGradient(const(float)[] grad)
+    override void startBatch()
     {
-        for(int n = 0; n < grad.length; ++n)
+        _batchSize = 0;
+
+
+        // Weight gradient reset
+        _weightGrad.length = _units * _inputUnits;
+        _weightGrad[] = 0;
+    }
+
+    override void stopBatch(float learningRate)
+    {
+        // learn weights
+        _weight[] += (_weightGrad[] * learningRate) * (learningRate / _batchSize);
+    }
+
+    override void doAccumulateGradient(ref const(Tensor) forwardGradients, ref Tensor backGradients)
+    {
+        int numIns = backGradients.shape().dimension[0];
+        int numOuts = forwardGradients.shape().dimension[0];
+
+         // For now, only 1x1x1 images supported, with N input fans
+        assert(forwardGradients.shape.is1D && backGradients.shape.is1D);
+
+        assert(_lastInput.shape.is1D);
+
+        for (int nOut = 0; nOut < numOuts; ++nOut)
         {
-            float value = _lastActivationValues[n];
-            _backGradients[n] = evalActivationFunctionDerivative(_activationFunction, value);
+            for (int nIns = 0; nIns < numIns; ++nIns)
+            {
+                _weightGrad[nIns + nOut * numIns] += forwardGradients.rawData[nOut] * _lastInput.rawData[nIns];
+            }
         }
+
+        for (int nIns = 0; nIns < numIns; ++nIns)
+        {
+            backGradients.rawData[nIns] = 0.0f;
+        }
+
+        for (int nOut = 0; nOut < numOuts; ++nOut)
+        {
+            float sum = _bias[nOut];
+            for (int nIns = 0; nIns < numIns; ++nIns)
+            {
+                backGradients.rawData[nIns] += forwardGradients.rawData[nOut] * _weight[nIns + nOut * numIns];
+            }        
+        }
+
+        _batchSize = _batchSize + 1;
     }
 
 private:
     float[] _bias;   // _numOuts biases
     float[] _weight; // _numIns * _numOuts weights
 
-    float[] _grad;
-
     int _units;
     int _inputUnits;
+
+    Tensor _lastInput;
+    float[] _weightGrad;
+    int _batchSize;
 }
 
 unittest
@@ -252,7 +274,7 @@ class Activation : NeuralLayer
         _inputShape = inputShape;
         _outputShape = inputShape;
 
-        _lastActivationValues.length = inputShape.dimension[0];
+        _lastActivationValues.resize(inputShape);
     }
 
     override bool isTrainable()
@@ -270,21 +292,21 @@ class Activation : NeuralLayer
         tensorCopy(output, input);        
         applyActivationFunction(_activationFunction, output.rawData);
 
-        // TODO make this a tensor
-        assert(output.shape.is1D);
-        _lastActivationValues[] = output.rawData[];
+        tensorCopy(_lastActivationValues, input);
     }
 
-    override void doAccumulateGradient(const(float)[] grad)
+    override void doAccumulateGradient(ref const(Tensor) forwardGradients, ref Tensor backGradients)
     {
-        for(int n = 0; n < grad.length; ++n)
+        int numScalars = _inputShape.elemCount();
+        for(int n = 0; n < numScalars; ++n)
         {
-            float value = _lastActivationValues[n];
-            _backGradients[n] = evalActivationFunctionDerivative(_activationFunction, value);
+            float value = _lastActivationValues.rawData[n];
+            backGradients.rawData[n] = forwardGradients.rawData[n]
+                                     * evalActivationFunctionDerivative(_activationFunction, value);
         }
     }
 
 private:
     ActivationFunction _activationFunction;
-    float[] _lastActivationValues;
+    Tensor _lastActivationValues;
 }

@@ -185,6 +185,20 @@ void tensorCopy(ref Tensor dest, ref const(Tensor) source)
     dest._data[] = source._data[];
 }
 
+/// Add data of an existing allocated tensor into another allocated tensor.
+void tensorAdd(ref Tensor dest, ref const(Tensor) source)
+{
+    assert(dest.shape == source.shape);
+    dest._data[] += source._data[];
+}
+
+/// Subtract data of an existing allocated tensor into another allocated tensor.
+void tensorSub(ref Tensor dest, ref const(Tensor) source)
+{
+    assert(dest.shape == source.shape);
+    dest._data[] -= source._data[];
+}
+
 
 private
 {

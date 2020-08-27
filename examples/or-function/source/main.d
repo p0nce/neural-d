@@ -41,31 +41,3 @@ void main(string[] args)
                 epochs);
 }
 
-  //  model.evaluate()
-/+
-model.computeAccuracy(Tensor(x[0..N_TRAINING]), 
-                Tensor(y[0..N_TRAINING])
-
-    model.
-
-
-}
-
-
-
-def compute_accuracy(self, x_val, y_val):
-    '''
-        This function does a forward pass of x, then checks if the indices
-        of the maximum value in the output equals the indices in the label
-        y. Then it sums over each prediction and calculates the accuracy.
-    '''
-    predictions = []
-
-    for x, y in zip(x_val, y_val):
-        output = self.forward_pass(x)
-        pred = np.argmax(output)
-        predictions.append(pred == y)
-    
-    summed = sum(pred for pred in predictions) / 100.0
-    return np.average(summed)
-+/

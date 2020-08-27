@@ -71,14 +71,6 @@ class Sequential : NeuralLayer
         return sum;
     }    
 
-    override void allocateTrainingData()
-    {
-        foreach(layer; _layers)
-        {
-            layer.allocateTrainingData();
-        }
-    }
-
     override void doPredict(ref const(Tensor) input, ref Tensor output)
     {
         Tensor t;
@@ -89,6 +81,31 @@ class Sequential : NeuralLayer
             tensorAssign(t, output);
         }
     }
+
+    override void startBatch()
+    {      
+        foreach(layer; _layers)
+            layer.startBatch();
+    }
+
+    override void doAccumulateGradient(ref const(Tensor) forwardGradients, ref Tensor backGradients)
+    {
+        Tensor t;
+        tensorAssign(t, forwardGradients);
+        foreach_reverse(layer; _layers)
+        {
+            layer.doAccumulateGradient(t, backGradients);
+            tensorAssign(t, backGradients);
+        }
+    }    
+
+    override void stopBatch(float learningRate)
+    {      
+        foreach(layer; _layers)
+            layer.stopBatch(learningRate);
+    }
+
+
 
     /// Gets the list of layers.
     inout(NeuralLayer)[] layers() inout
@@ -143,22 +160,20 @@ class Sequential : NeuralLayer
         // Initialize the network, so that every layer has a defined shape.
         lazyInitialization(x[0].shape);
 
-        // Allocated training data
-        allocateTrainingData();
-
         foreach(epoch; 0..epochs)
         {
             assert(x.shape.dimension[0] == y.shape.dimension[0]);   
 
-            double totalLoss = 0;
-
             for (int batch = 0;  batch < numBatches; ++batch)
             {
                 int batchStart = batch * minibatchSize;         
-                int batchStop = (batch+1) * minibatchSize;  
-
+                int batchStop = (batch+1) * minibatchSize;
 
                 // Start a mini-batch
+
+                double totalLoss = 0;
+
+                startBatch();
 
                 for (int sample = batchStart; sample < batchStop; ++sample)
                 {
@@ -169,23 +184,33 @@ class Sequential : NeuralLayer
                     Tensor pred;
                     predict(subx, pred);
 
-                    // TODO: update weights
 
-  
-         //   var outputErrors = targetSignals - finalOutputs;            
-         //   var hiddenErrors = _weightHiddenOutput.Transpose() * outputErrors;
+                    // Compute output gradient difference with regards to 
+                    // the MSE error.
+                    // dMSE/pred = 2*(pred - suby)
+                    Tensor grad;
+                    tensorAssign(grad, pred);
+                    tensorSub(grad, suby);
 
+//import std.stdio;
+  //                  writefln("%s", grad.rawData);
+
+
+                    // Back propagate gradient.
+                    Tensor gradients, backGradients;
+                    tensorAssign(gradients, grad);
+                    foreach_reverse(layer; _layers)
+                    {
+                        layer.accumulateGradient(gradients, backGradients);
+                        tensorAssign(gradients, backGradients);
+                    }
                 }
+
+                float lr = _optimizer.learningRate();
+                stopBatch(lr);
             }
-
-
-         /*   foreach()
-            // forward pass */
-
         }
-
     }
-
 
 private:
     NeuralLayer[] _layers;

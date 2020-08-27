@@ -12,6 +12,7 @@ enum LossFunction
 
 interface Optimizer
 {    
+    float learningRate();
 }
 
 class SGDOptimizer : Optimizer
@@ -20,6 +21,11 @@ class SGDOptimizer : Optimizer
     {
         _learningRate = learningRate;
     } 
+
+    override float learningRate()
+    {
+        return _learningRate;
+    }
 
 private:
     float _learningRate;
