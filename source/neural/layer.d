@@ -178,7 +178,7 @@ class Dense : NeuralLayer
     override int trainableParams()
     {
         assert(_initialized);
-        return _units // bias
+        return _units // biases
               + _units * _inputUnits; // weights
     }
 
@@ -193,6 +193,7 @@ class Dense : NeuralLayer
         int numOuts = output.shape().dimension[0];
 
         // For now, only 1x1x1 images supported, with N input fans
+        // TODO: lift this limitation!
         assert(input.shape.is1D && output.shape.is1D);
 
         for (int nOut = 0; nOut < numOuts; ++nOut)
@@ -205,23 +206,32 @@ class Dense : NeuralLayer
             output.rawData[nOut] = sum;
         }  
 
-        tensorAssign(_lastInput, input);       
+        tensorAssign(_lastInput, input);
     }
 
     override void startBatch()
     {
         _batchSize = 0;
 
-
         // Weight gradient reset
         _weightGrad.length = _units * _inputUnits;
         _weightGrad[] = 0;
+
+        // Bias gradient reset
+        _biasGrad.length = _units;
+        _biasGrad[] = 0;
     }
 
     override void stopBatch(float learningRate)
     {
+        // averages the learning rate by item in the mini-batch
+        learningRate /= _batchSize;
+
         // learn weights
-        _weight[] -= (_weightGrad[] * learningRate) * (learningRate / _batchSize);
+        _weight[] -= _weightGrad[] * learningRate;
+
+        // learn biases
+        _bias[]   -= _biasGrad[]   * learningRate;
     }
 
     override void doAccumulateGradient(ref const(Tensor) forwardGradients, ref Tensor backGradients)
@@ -234,12 +244,14 @@ class Dense : NeuralLayer
 
         assert(_lastInput.shape.is1D);
 
+        // Compute loss gradient, when derived by each trainable parameter.
         for (int nOut = 0; nOut < numOuts; ++nOut)
         {
             for (int nIns = 0; nIns < numIns; ++nIns)
             {
                 _weightGrad[nIns + nOut * numIns] += forwardGradients.rawData[nOut] * _lastInput.rawData[nIns];
             }
+            _biasGrad[nOut] += forwardGradients.rawData[nOut];
         }
 
         for (int nIns = 0; nIns < numIns; ++nIns)
@@ -253,7 +265,7 @@ class Dense : NeuralLayer
             for (int nIns = 0; nIns < numIns; ++nIns)
             {
                 backGradients.rawData[nIns] += forwardGradients.rawData[nOut] * _weight[nIns + nOut * numIns];
-            }        
+            }
         }
 
         _batchSize = _batchSize + 1;
@@ -268,6 +280,7 @@ private:
 
     Tensor _lastInput;
     float[] _weightGrad;
+    float[] _biasGrad;
     int _batchSize;
 }
 

@@ -5,7 +5,7 @@ import std.random;
 
 float functionToApproximate(float x)
 {
-    return 3.14150f * x + uniform(-0.2f, 0.2f);
+    return 3.14150f * x + 2 +  uniform(-0.1f, 0.1f);
 }
 
 void main(string[] args)
