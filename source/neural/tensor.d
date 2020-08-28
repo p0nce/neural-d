@@ -49,6 +49,13 @@ struct Shape
         return Shape(dimension[1], dimension[2], dimension[3], dimension[4], 1);
     }
 
+    Shape inLargerArray(int sizeOfHighestDimension) pure const nothrow @nogc
+    {
+        assert(dimension[4] == 1); // need larger dimensions
+        return Shape(sizeOfHighestDimension, dimension[0], dimension[1], dimension[2], dimension[3]);
+    }
+
+
     /// How many scalars there are in this[0]
     int itemStride() pure const nothrow @nogc
     {
@@ -128,6 +135,17 @@ public:
         t._borrowed = true;
         t._shape    = _shape.itemDimension();
         t._data     = _data[n*stride..(n+1)*stride];
+        return t;
+    }
+
+    // Get a sub-tensor copy with less dimensions.
+    Tensor opIndex(size_t n) const
+    {
+        int stride = _shape.itemStride();
+        Tensor t;
+        t._borrowed = true;
+        t._shape    = _shape.itemDimension();
+        t._data     = _data[n*stride..(n+1)*stride].dup;
         return t;
     }
 

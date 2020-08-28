@@ -52,6 +52,27 @@ class NeuralLayer
         }
     }
 
+    /// Predict several samples at once (a tensor of input tensors).
+    /// TODO: if predict can take any tensor size, then maybe there wouldn't be a need
+    /// for such an operation.
+    void predictBatch(ref const(Tensor) input, ref Tensor output)
+    {
+        lazyInitialization(input[0].shape);
+
+        int sampleCount = input.shape.dimension[0];
+
+        // Eventually the output tensor might be uninitialized
+        output.resize(_outputShape.inLargerArray(sampleCount));
+        Tensor outsample;
+        for (int n = 0; n < sampleCount; n++)
+        {
+            Tensor insample = input[n];
+            predict(insample, outsample);
+            Tensor item = output[n];
+            tensorCopy(item, outsample);
+        }
+    }
+
     void predict(ref const(Tensor) input, ref Tensor output)
     {
         lazyInitialization(input.shape);        
@@ -200,7 +221,7 @@ class Dense : NeuralLayer
     override void stopBatch(float learningRate)
     {
         // learn weights
-        _weight[] += (_weightGrad[] * learningRate) * (learningRate / _batchSize);
+        _weight[] -= (_weightGrad[] * learningRate) * (learningRate / _batchSize);
     }
 
     override void doAccumulateGradient(ref const(Tensor) forwardGradients, ref Tensor backGradients)

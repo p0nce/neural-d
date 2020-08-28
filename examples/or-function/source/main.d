@@ -10,8 +10,8 @@ float functionToApproximate(float x)
 
 void main(string[] args)
 {
-    int N_DATASET = 200;
-    int N_TRAINING = 100;
+    int N_DATASET = 2000;
+    int N_TRAINING = 1000;
     int N_TEST = N_DATASET - N_TRAINING;
 
     float[] x = new float[N_DATASET];
@@ -32,12 +32,34 @@ void main(string[] args)
 
     model.compile(new SGDOptimizer(0.01f), LossFunction.MSE );
 
-    int epochs = 10;
+    int epochs = 100000;
     int minibatch = 32;
 
-    model.train(Tensor(x[0..N_TRAINING]), 
-                Tensor(y[0..N_TRAINING]), 
-                minibatch,
-                epochs);
+    // Compute MSE and display it
+    void displayMSE()
+    {
+        Tensor input  = Tensor(x[N_TRAINING..N_DATASET]);
+        Tensor expected = Tensor(y[N_TRAINING..N_DATASET]);
+        Tensor output;
+        model.predictBatch(input, output);
+        double MSE = 0;
+
+        for(int n = 0; n < N_TEST; ++n)
+        {
+            MSE += ((expected.rawData[n] - output.rawData[n]) * (expected.rawData[n] - output.rawData[n]));
+        }
+        import std.stdio;
+        writefln("MSE = %s", MSE);
+    }
+
+    foreach(epoch; 0..1000)
+    {
+        model.train(Tensor(x[0..N_TRAINING]), 
+                    Tensor(y[0..N_TRAINING]), 
+                    minibatch,
+                    1);
+        displayMSE();
+    }
+    
 }
 

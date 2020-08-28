@@ -192,10 +192,6 @@ class Sequential : NeuralLayer
                     tensorAssign(grad, pred);
                     tensorSub(grad, suby);
 
-//import std.stdio;
-  //                  writefln("%s", grad.rawData);
-
-
                     // Back propagate gradient.
                     Tensor gradients, backGradients;
                     tensorAssign(gradients, grad);
