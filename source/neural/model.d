@@ -105,8 +105,6 @@ class Sequential : NeuralLayer
             layer.stopBatch(learningRate);
     }
 
-
-
     /// Gets the list of layers.
     inout(NeuralLayer)[] layers() inout
     {
@@ -152,7 +150,7 @@ class Sequential : NeuralLayer
     /// samples x units x image-height x image-width x colors
     void train(Tensor x, Tensor y, int minibatchSize, int epochs)
     {
-        int numSamples = x.shape.dimension[0];        
+        int numSamples = x.shape.dimension[0];
         assert(numSamples >= minibatchSize); // else, no learning
 
         int numBatches = numSamples / minibatchSize;
@@ -216,7 +214,7 @@ private:
 
     // Should be here??   
     Optimizer _optimizer;
-    LossFunction _lossFunction;
+    LossFunction _lossFunction; // Note: this is currently unused. SHoudl exist only while the duration of a "train" call?
 }
 
 unittest

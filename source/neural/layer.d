@@ -53,7 +53,7 @@ class NeuralLayer
     }
 
     /// Predict several samples at once (a tensor of input tensors).
-    /// TODO: if predict can take any tensor size, then maybe there wouldn't be a need
+    /// TODO: if predict could take any tensor size, then maybe there wouldn't be a need
     /// for such an operation.
     void predictBatch(ref const(Tensor) input, ref Tensor output)
     {

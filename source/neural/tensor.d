@@ -55,7 +55,6 @@ struct Shape
         return Shape(sizeOfHighestDimension, dimension[0], dimension[1], dimension[2], dimension[3]);
     }
 
-
     /// How many scalars there are in this[0]
     int itemStride() pure const nothrow @nogc
     {
@@ -85,15 +84,26 @@ unittest
 struct Tensor
 {
 public:
+
+    /// Build an uninitialized tensor with pre-defined shape.
     this(Shape shape)
     {
         resize(shape);
     }
 
-    this(float[] shape)
+    /// Build a 1D tensor with copied data.
+    this(float[] data)
     {
-        resize(Shape(cast(int)shape.length, 1, 1, 1));
-        _data[] = shape[];
+        resize(Shape(cast(int)data.length, 1, 1, 1));
+        _data[] = data;
+    }
+
+    /// Build a tensor with copied data, and enforce a particular shape to the input.
+    this(float[] data, Shape shape)
+    {
+        resize(shape);
+        assert(shape.elemCount == data.length);
+        _data[] = data[];
     }
 
     ~this()

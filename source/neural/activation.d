@@ -8,7 +8,9 @@ import inteli.math;
 
 enum ActivationFunction
 {
-    ReLU,   
+    SIGMOID,
+    RELU,
+    LEAKY_RELU,
     SELU, 
 }
 
@@ -16,10 +18,23 @@ float evalActivationFunction(ActivationFunction activation, float x)
 {
     final switch(activation) with (ActivationFunction)
     {
-        case ReLU:
+        case SIGMOID:
+        {
+            return 1.0f / (1.0f + _mm_exp_ss(x));
+        }
+
+        case RELU:
         {
             if (x < 0)
                 return 0;
+            else
+                return x;
+        }
+
+        case LEAKY_RELU:
+        {
+            if (x < 0)
+                return 0.3f * x;
             else
                 return x;
         }
@@ -48,10 +63,24 @@ float evalActivationFunctionDerivative(ActivationFunction activation, float x)
 {
     final switch(activation) with (ActivationFunction)
     {
-        case ReLU:
+        case SIGMOID:
+        {
+            float sigx = 1.0f / (1.0f + _mm_exp_ss(x));
+            return sigx * (1 - sigx);
+        }
+
+        case RELU:
         {
             if (x < 0)
                 return 0;
+            else
+                return 1;
+        }
+
+        case LEAKY_RELU:
+        {
+            if (x < 0)
+                return 0.3f;
             else
                 return 1;
         }

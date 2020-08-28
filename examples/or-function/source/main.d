@@ -1,11 +1,12 @@
 import neural;
 
-
+import std.stdio;
 import std.random;
+import std.math;
 
-float functionToApproximate(float x)
+float orFunction(float A, float B)
 {
-    return 3.14150f * x + 2 +  uniform(-0.1f, 0.1f);
+    return ((A > 0.5f) || (B > 0.5f)) ? 1.0f : 0.0f;
 }
 
 void main(string[] args)
@@ -14,32 +15,31 @@ void main(string[] args)
     int N_TRAINING = 1000;
     int N_TEST = N_DATASET - N_TRAINING;
 
-    float[] x = new float[N_DATASET];
+    float[] x = new float[2*N_DATASET];
     float[] y = new float[N_DATASET];
 
     for(int n = 0; n < N_DATASET; ++n)
     {
-        x[n] = uniform(-1, 1);
-        y[n] = functionToApproximate(x[n]);
+        x[2*n] = uniform(0.0f, 1.0f);
+        x[2*n+1] = uniform(0.0f, 1.0f);
+        y[n] = orFunction(x[2*n], x[2*n+1]);
     }
 
     auto model = new Sequential();
+    model.add( new Dense(4), Shape(2) );
+    model.add( new Activation(ActivationFunction.SELU ) );
     model.add( new Dense(2), Shape(2) );
     model.add( new Activation(ActivationFunction.SELU ) );
     model.add( new Dense(1) );
 
     model.summary();
 
-    model.compile(new SGDOptimizer(0.01f), LossFunction.MSE );
-
-    int epochs = 100000;
-    int minibatch = 32;
 
     // Compute MSE and display it
     void displayMSE()
     {
-        Tensor input  = Tensor(x[N_TRAINING..N_DATASET]);
-        Tensor expected = Tensor(y[N_TRAINING..N_DATASET]);
+        Tensor input  = Tensor(x[2*N_TRAINING..2*N_DATASET], Shape(N_TEST, 2));
+        Tensor expected = Tensor(y[N_TRAINING..N_DATASET], Shape(N_TEST));
         Tensor output;
         model.predictBatch(input, output);
         double MSE = 0;
@@ -49,13 +49,18 @@ void main(string[] args)
             MSE += ((expected.rawData[n] - output.rawData[n]) * (expected.rawData[n] - output.rawData[n]));
         }
         import std.stdio;
-        writefln("MSE = %s", MSE);
+        MSE /= N_TEST;
+        writefln("MSE = %s", sqrt(MSE));
     }
 
-    foreach(epoch; 0..1000)
+    model.compile(new SGDOptimizer(0.05f), LossFunction.MSE );
+
+    foreach(epoch; 0..100000)
     {
-        model.train(Tensor(x[0..N_TRAINING]), 
-                    Tensor(y[0..N_TRAINING]), 
+        int minibatch = 32;
+        int offset = epoch % minibatch;
+        model.train(Tensor(x[offset..2*(N_TRAINING+offset)], Shape(N_TRAINING, 2)), 
+                    Tensor(y[offset..N_TRAINING+offset]), 
                     minibatch,
                     1);
         displayMSE();
