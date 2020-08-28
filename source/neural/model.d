@@ -233,6 +233,10 @@ unittest
 unittest
 {
     auto model = new Sequential;
-    model.add(new Input(Shape(16)));
     model.add(new Dense(8));
+
+    // Else, the size is inferred from input size
+    Tensor output;
+    Tensor input = Tensor(Shape(16));
+    model.predict(input, output);
 }

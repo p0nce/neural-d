@@ -1,0 +1,11 @@
+{
+    "name": "neural-d",
+
+    "description": "A simple and useless library for understanding neural networks.",
+    "license": "Apache-2.0",
+
+    "dependencies":
+    {
+        "intel-intrinsics": "~>1.0"
+    }
+}
