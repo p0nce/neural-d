@@ -1,0 +1,8 @@
+{
+    "name": "mnist-classifier",
+
+    "dependencies":
+    {
+        "neural-d": { "path": "../.." },
+    }
+}

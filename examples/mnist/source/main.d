@@ -63,6 +63,6 @@ void main(string[] args)
                     minibatch,
                     1);
         displayMSE();
-    }
+    }    
 }
 
