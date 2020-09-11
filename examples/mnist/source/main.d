@@ -3,11 +3,14 @@ import neural;
 import std.stdio;
 import std.random;
 import std.math;
+import std.file;
 
-float orFunction(float A, float B)
+Tensor loadImageFile(string path)
 {
-    return ((A > 0.5f) || (B > 0.5f)) ? 1.0f : 0.0f;
+    ubyte[] contents = cast(ubyte)[] std.file.read(path);
+
 }
+
 
 void main(string[] args)
 {
